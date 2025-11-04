@@ -79,12 +79,97 @@ class DayEntryWindow(wx.Frame):
         self.Close()
 
 # ----------------------
+# Weekly Summary Window
+# ----------------------
+
+class WeeklySummaryWindow(wx.Frame):
+    def __init__(self, parent, data):
+        super().__init__(parent, title="Weekly Summary", size=(400, 300))
+        panel = wx.Panel(self)
+
+        wx.StaticText(panel, label="7-Day Wellness Summary", pos=(120, 20))
+
+        # Calculate weekly averages
+        last_7_days = sorted([d for d in data.keys() if d != "goals"])[-7:]
+        total = {"exercise": 0, "sleep": 0, "water": 0, "calories": 0}
+        mood_counts = {}
+
+        for day in last_7_days:
+            entry = data.get(day, {})
+            for key in total.keys():
+                total[key] += float(entry.get(key, 0) or 0)
+            mood = entry.get("mood", "")
+            if mood:
+                mood_counts[mood] = mood_counts.get(mood, 0) + 1
+
+        if last_7_days:
+            avg_exercise = total["exercise"] / len(last_7_days)
+            avg_sleep = total["sleep"] / len(last_7_days)
+            avg_water = total["water"] / len(last_7_days)
+            avg_calories = total["calories"] / len(last_7_days)
+            common_mood = max(mood_counts, key=mood_counts.get) if mood_counts else "N/A"
+        else:
+            avg_exercise = avg_sleep = avg_water = avg_calories = 0
+            common_mood = "N/A"
+
+        wx.StaticText(panel, label=f"Avg Exercise: {avg_exercise:.1f} min", pos=(50, 70))
+        wx.StaticText(panel, label=f"Avg Sleep: {avg_sleep:.1f} hrs", pos=(50, 100))
+        wx.StaticText(panel, label=f"Avg Water: {avg_water:.1f} glasses", pos=(50, 130))
+        wx.StaticText(panel, label=f"Avg Calories: {avg_calories:.1f}", pos=(50, 160))
+        wx.StaticText(panel, label=f"Most Common Mood: {common_mood}", pos=(50, 190))
+
+# ----------------------
+# Goals Window
+# ----------------------
+
+class GoalsWindow(wx.Frame):
+    def __init__(self, parent, data):
+        super().__init__(parent, title="Set Your Goals", size=(400, 300))
+        panel = wx.Panel(self)
+        self.data = data
+
+        wx.StaticText(panel, label="Daily Goals:", pos=(150, 20))
+        wx.StaticText(panel, label="Exercise (min):", pos=(30, 70))
+        wx.StaticText(panel, label="Sleep (hours):", pos=(30, 110))
+        wx.StaticText(panel, label="Water (glasses):", pos=(30, 150))
+        wx.StaticText(panel, label="Calories (max):", pos=(30, 190))
+
+        self.exercise_goal = wx.TextCtrl(panel, pos=(180, 70), size=(150, -1))
+        self.sleep_goal = wx.TextCtrl(panel, pos=(180, 110), size=(150, -1))
+        self.water_goal = wx.TextCtrl(panel, pos=(180, 150), size=(150, -1))
+        self.calories_goal = wx.TextCtrl(panel, pos=(180, 190), size=(150, -1))
+
+        # Load existing goals
+        goals = self.data.get("goals", {})
+        self.exercise_goal.SetValue(str(goals.get("exercise_goal", "")))
+        self.sleep_goal.SetValue(str(goals.get("sleep_goal", "")))
+        self.water_goal.SetValue(str(goals.get("water_goal", "")))
+        self.calories_goal.SetValue(str(goals.get("calories_goal", "")))
+
+        save_btn = wx.Button(panel, label="Save Goals", pos=(140, 230))
+        save_btn.Bind(wx.EVT_BUTTON, self.on_save)
+
+    def on_save(self, event):
+        goals = {
+            "exercise_goal": self.exercise_goal.GetValue(),
+            "sleep_goal": self.sleep_goal.GetValue(),
+            "water_goal": self.water_goal.GetValue(),
+            "calories_goal": self.calories_goal.GetValue()
+        }
+
+        self.data["goals"] = goals
+        save_data(self.data)
+
+        wx.MessageBox("Goals saved successfully!", "Saved", wx.OK | wx.ICON_INFORMATION)
+        self.Close()
+
+# ----------------------
 # Main Window
 # ----------------------
 
 class MainWindow(wx.Frame):
     def __init__(self):
-        super().__init__(None, title="Mindful Path Wellness Tracker", size=(400, 250))
+        super().__init__(None, title="Mindful Path Wellness Tracker", size=(400, 300))
         panel = wx.Panel(self)
 
         self.data = load_data()
@@ -94,11 +179,15 @@ class MainWindow(wx.Frame):
 
         prev_btn = wx.Button(panel, label="<< Previous", pos=(50, 70))
         next_btn = wx.Button(panel, label="Next >>", pos=(230, 70))
-        open_day_btn = wx.Button(panel, label="Open Daily Entry", pos=(130, 130))
+        open_day_btn = wx.Button(panel, label="Open Daily Entry", pos=(130, 120))
+        weekly_btn = wx.Button(panel, label="Weekly Summary", pos=(50, 180))
+        goals_btn = wx.Button(panel, label="Set Goals", pos=(230, 180))
 
         prev_btn.Bind(wx.EVT_BUTTON, self.on_prev_day)
         next_btn.Bind(wx.EVT_BUTTON, self.on_next_day)
         open_day_btn.Bind(wx.EVT_BUTTON, self.on_open_day)
+        weekly_btn.Bind(wx.EVT_BUTTON, self.on_weekly_summary)
+        goals_btn.Bind(wx.EVT_BUTTON, self.on_goals)
 
         self.Bind(wx.EVT_CLOSE, self.on_close)
         self.Show()
@@ -113,6 +202,14 @@ class MainWindow(wx.Frame):
 
     def on_open_day(self, event):
         window = DayEntryWindow(self, self.current_date, self.data)
+        window.Show()
+
+    def on_weekly_summary(self, event):
+        window = WeeklySummaryWindow(self, self.data)
+        window.Show()
+
+    def on_goals(self, event):
+        window = GoalsWindow(self, self.data)
         window.Show()
 
     def on_close(self, event):
@@ -132,3 +229,4 @@ class MindfulPathApp(wx.App):
 if __name__ == "__main__":
     app = MindfulPathApp()
     app.MainLoop()
+
