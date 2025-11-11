@@ -79,7 +79,7 @@ class DayEntryWindow(wx.Frame):
         self.Close()
 
 # ----------------------
-# Weekly Summary Window
+# Weekly Summary Window (Fixed to show *last 7 calendar days*)
 # ----------------------
 
 class WeeklySummaryWindow(wx.Frame):
@@ -89,34 +89,55 @@ class WeeklySummaryWindow(wx.Frame):
 
         wx.StaticText(panel, label="7-Day Wellness Summary", pos=(120, 20))
 
-        # Calculate weekly averages
-        last_7_days = sorted([d for d in data.keys() if d != "goals"])[-7:]
+        # Get today's date and the date 7 days ago
+        today = datetime.date.today()
+        seven_days_ago = today - datetime.timedelta(days=7)
+
+        # Filter entries only from the past 7 calendar days
+        valid_entries = {}
+        for key, entry in data.items():
+            if key == "goals":
+                continue
+            try:
+                entry_date = datetime.datetime.strptime(key, "%Y-%m-%d").date()
+                if seven_days_ago <= entry_date <= today:
+                    valid_entries[key] = entry
+            except ValueError:
+                continue  # skip invalid formats
+
+        # Sort filtered entries by date (descending)
+        sorted_entries = sorted(valid_entries.items(), key=lambda x: x[0], reverse=True)
+
         total = {"exercise": 0, "sleep": 0, "water": 0, "calories": 0}
         mood_counts = {}
 
-        for day in last_7_days:
-            entry = data.get(day, {})
+        for _, entry in sorted_entries:
             for key in total.keys():
                 total[key] += float(entry.get(key, 0) or 0)
             mood = entry.get("mood", "")
             if mood:
                 mood_counts[mood] = mood_counts.get(mood, 0) + 1
 
-        if last_7_days:
-            avg_exercise = total["exercise"] / len(last_7_days)
-            avg_sleep = total["sleep"] / len(last_7_days)
-            avg_water = total["water"] / len(last_7_days)
-            avg_calories = total["calories"] / len(last_7_days)
+        num_days = len(sorted_entries)
+        if num_days > 0:
+            avg_exercise = total["exercise"] / num_days
+            avg_sleep = total["sleep"] / num_days
+            avg_water = total["water"] / num_days
+            avg_calories = total["calories"] / num_days
             common_mood = max(mood_counts, key=mood_counts.get) if mood_counts else "N/A"
         else:
             avg_exercise = avg_sleep = avg_water = avg_calories = 0
             common_mood = "N/A"
 
-        wx.StaticText(panel, label=f"Avg Exercise: {avg_exercise:.1f} min", pos=(50, 70))
-        wx.StaticText(panel, label=f"Avg Sleep: {avg_sleep:.1f} hrs", pos=(50, 100))
-        wx.StaticText(panel, label=f"Avg Water: {avg_water:.1f} glasses", pos=(50, 130))
-        wx.StaticText(panel, label=f"Avg Calories: {avg_calories:.1f}", pos=(50, 160))
-        wx.StaticText(panel, label=f"Most Common Mood: {common_mood}", pos=(50, 190))
+        if num_days == 0:
+            wx.StaticText(panel, label="No data available for the past 7 days.", pos=(80, 130))
+        else:
+            wx.StaticText(panel, label=f"Days included: {num_days}", pos=(50, 50))
+            wx.StaticText(panel, label=f"Avg Exercise: {avg_exercise:.1f} min", pos=(50, 80))
+            wx.StaticText(panel, label=f"Avg Sleep: {avg_sleep:.1f} hrs", pos=(50, 110))
+            wx.StaticText(panel, label=f"Avg Water: {avg_water:.1f} glasses", pos=(50, 140))
+            wx.StaticText(panel, label=f"Avg Calories: {avg_calories:.1f}", pos=(50, 170))
+            wx.StaticText(panel, label=f"Most Common Mood: {common_mood}", pos=(50, 200))
 
 # ----------------------
 # Goals Window
@@ -229,4 +250,5 @@ class MindfulPathApp(wx.App):
 if __name__ == "__main__":
     app = MindfulPathApp()
     app.MainLoop()
+
 
