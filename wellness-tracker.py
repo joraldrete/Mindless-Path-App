@@ -79,7 +79,7 @@ class DayEntryWindow(wx.Frame):
         self.Close()
 
 # ----------------------
-# Weekly Summary Window (Fixed to show *last 7 calendar days*)
+# Weekly Summary Window (fixed last 7 calendar days)
 # ----------------------
 
 class WeeklySummaryWindow(wx.Frame):
@@ -89,11 +89,9 @@ class WeeklySummaryWindow(wx.Frame):
 
         wx.StaticText(panel, label="7-Day Wellness Summary", pos=(120, 20))
 
-        # Get today's date and the date 7 days ago
         today = datetime.date.today()
         seven_days_ago = today - datetime.timedelta(days=7)
 
-        # Filter entries only from the past 7 calendar days
         valid_entries = {}
         for key, entry in data.items():
             if key == "goals":
@@ -103,9 +101,8 @@ class WeeklySummaryWindow(wx.Frame):
                 if seven_days_ago <= entry_date <= today:
                     valid_entries[key] = entry
             except ValueError:
-                continue  # skip invalid formats
+                continue
 
-        # Sort filtered entries by date (descending)
         sorted_entries = sorted(valid_entries.items(), key=lambda x: x[0], reverse=True)
 
         total = {"exercise": 0, "sleep": 0, "water": 0, "calories": 0}
@@ -160,7 +157,6 @@ class GoalsWindow(wx.Frame):
         self.water_goal = wx.TextCtrl(panel, pos=(180, 150), size=(150, -1))
         self.calories_goal = wx.TextCtrl(panel, pos=(180, 190), size=(150, -1))
 
-        # Load existing goals
         goals = self.data.get("goals", {})
         self.exercise_goal.SetValue(str(goals.get("exercise_goal", "")))
         self.sleep_goal.SetValue(str(goals.get("sleep_goal", "")))
@@ -177,11 +173,102 @@ class GoalsWindow(wx.Frame):
             "water_goal": self.water_goal.GetValue(),
             "calories_goal": self.calories_goal.GetValue()
         }
-
         self.data["goals"] = goals
         save_data(self.data)
-
         wx.MessageBox("Goals saved successfully!", "Saved", wx.OK | wx.ICON_INFORMATION)
+        self.Close()
+
+# ----------------------
+# Nutrition Tracker Window
+# ----------------------
+
+class NutritionTrackerWindow(wx.Frame):
+    def __init__(self, parent, date, data):
+        super().__init__(parent, title=f"Nutrition Tracker - {date}", size=(400, 400))
+        self.date = str(date)
+        self.data = data
+
+        panel = wx.Panel(self)
+        wx.StaticText(panel, label="Log Your Meals and Calories:", pos=(100, 20))
+
+        wx.StaticText(panel, label="Breakfast (cal):", pos=(30, 70))
+        self.breakfast = wx.TextCtrl(panel, pos=(180, 70), size=(150, -1))
+
+        wx.StaticText(panel, label="Lunch (cal):", pos=(30, 110))
+        self.lunch = wx.TextCtrl(panel, pos=(180, 110), size=(150, -1))
+
+        wx.StaticText(panel, label="Dinner (cal):", pos=(30, 150))
+        self.dinner = wx.TextCtrl(panel, pos=(180, 150), size=(150, -1))
+
+        wx.StaticText(panel, label="Snacks (cal):", pos=(30, 190))
+        self.snacks = wx.TextCtrl(panel, pos=(180, 190), size=(150, -1))
+
+        save_btn = wx.Button(panel, label="Save Nutrition", pos=(130, 250))
+        save_btn.Bind(wx.EVT_BUTTON, self.on_save)
+
+        if self.date in self.data and "nutrition" in self.data[self.date]:
+            entry = self.data[self.date]["nutrition"]
+            self.breakfast.SetValue(str(entry.get("breakfast", "")))
+            self.lunch.SetValue(str(entry.get("lunch", "")))
+            self.dinner.SetValue(str(entry.get("dinner", "")))
+            self.snacks.SetValue(str(entry.get("snacks", "")))
+
+    def on_save(self, event):
+        if self.date not in self.data:
+            self.data[self.date] = {}
+
+        self.data[self.date]["nutrition"] = {
+            "breakfast": self.breakfast.GetValue(),
+            "lunch": self.lunch.GetValue(),
+            "dinner": self.dinner.GetValue(),
+            "snacks": self.snacks.GetValue(),
+        }
+
+        save_data(self.data)
+        wx.MessageBox("Nutrition data saved!", "Saved", wx.OK | wx.ICON_INFORMATION)
+        self.Close()
+
+# ----------------------
+# Sleep Tracker Window
+# ----------------------
+
+class SleepTrackerWindow(wx.Frame):
+    def __init__(self, parent, date, data):
+        super().__init__(parent, title=f"Sleep Tracker - {date}", size=(400, 300))
+        self.date = str(date)
+        self.data = data
+
+        panel = wx.Panel(self)
+        wx.StaticText(panel, label="Sleep Tracking", pos=(150, 20))
+        wx.StaticText(panel, label="Hours Slept:", pos=(30, 70))
+        wx.StaticText(panel, label="Sleep Quality (1-10):", pos=(30, 110))
+        wx.StaticText(panel, label="Bedtime (HH:MM):", pos=(30, 150))
+
+        self.hours = wx.TextCtrl(panel, pos=(180, 70), size=(150, -1))
+        self.quality = wx.TextCtrl(panel, pos=(180, 110), size=(150, -1))
+        self.bedtime = wx.TextCtrl(panel, pos=(180, 150), size=(150, -1))
+
+        save_btn = wx.Button(panel, label="Save Sleep Data", pos=(130, 200))
+        save_btn.Bind(wx.EVT_BUTTON, self.on_save)
+
+        if self.date in self.data and "sleep_tracker" in self.data[self.date]:
+            entry = self.data[self.date]["sleep_tracker"]
+            self.hours.SetValue(str(entry.get("hours", "")))
+            self.quality.SetValue(str(entry.get("quality", "")))
+            self.bedtime.SetValue(str(entry.get("bedtime", "")))
+
+    def on_save(self, event):
+        if self.date not in self.data:
+            self.data[self.date] = {}
+
+        self.data[self.date]["sleep_tracker"] = {
+            "hours": self.hours.GetValue(),
+            "quality": self.quality.GetValue(),
+            "bedtime": self.bedtime.GetValue(),
+        }
+
+        save_data(self.data)
+        wx.MessageBox("Sleep data saved!", "Saved", wx.OK | wx.ICON_INFORMATION)
         self.Close()
 
 # ----------------------
@@ -190,7 +277,7 @@ class GoalsWindow(wx.Frame):
 
 class MainWindow(wx.Frame):
     def __init__(self):
-        super().__init__(None, title="Mindful Path Wellness Tracker", size=(400, 300))
+        super().__init__(None, title="Mindful Path Wellness Tracker", size=(420, 380))
         panel = wx.Panel(self)
 
         self.data = load_data()
@@ -203,12 +290,16 @@ class MainWindow(wx.Frame):
         open_day_btn = wx.Button(panel, label="Open Daily Entry", pos=(130, 120))
         weekly_btn = wx.Button(panel, label="Weekly Summary", pos=(50, 180))
         goals_btn = wx.Button(panel, label="Set Goals", pos=(230, 180))
+        nutrition_btn = wx.Button(panel, label="Nutrition Tracker", pos=(50, 240))
+        sleep_btn = wx.Button(panel, label="Sleep Tracker", pos=(230, 240))
 
         prev_btn.Bind(wx.EVT_BUTTON, self.on_prev_day)
         next_btn.Bind(wx.EVT_BUTTON, self.on_next_day)
         open_day_btn.Bind(wx.EVT_BUTTON, self.on_open_day)
         weekly_btn.Bind(wx.EVT_BUTTON, self.on_weekly_summary)
         goals_btn.Bind(wx.EVT_BUTTON, self.on_goals)
+        nutrition_btn.Bind(wx.EVT_BUTTON, self.on_nutrition)
+        sleep_btn.Bind(wx.EVT_BUTTON, self.on_sleep)
 
         self.Bind(wx.EVT_CLOSE, self.on_close)
         self.Show()
@@ -222,16 +313,19 @@ class MainWindow(wx.Frame):
         self.date_label.SetLabel(str(self.current_date))
 
     def on_open_day(self, event):
-        window = DayEntryWindow(self, self.current_date, self.data)
-        window.Show()
+        DayEntryWindow(self, self.current_date, self.data).Show()
 
     def on_weekly_summary(self, event):
-        window = WeeklySummaryWindow(self, self.data)
-        window.Show()
+        WeeklySummaryWindow(self, self.data).Show()
 
     def on_goals(self, event):
-        window = GoalsWindow(self, self.data)
-        window.Show()
+        GoalsWindow(self, self.data).Show()
+
+    def on_nutrition(self, event):
+        NutritionTrackerWindow(self, self.current_date, self.data).Show()
+
+    def on_sleep(self, event):
+        SleepTrackerWindow(self, self.current_date, self.data).Show()
 
     def on_close(self, event):
         save_data(self.data)
@@ -250,5 +344,3 @@ class MindfulPathApp(wx.App):
 if __name__ == "__main__":
     app = MindfulPathApp()
     app.MainLoop()
-
-
