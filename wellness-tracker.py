@@ -59,6 +59,7 @@ class DayEntryWindow(wx.Frame):
         # Load existing data if available
         if self.date in self.data:
             entry = self.data[self.date]
+            # top-level keys
             self.exercise.SetValue(str(entry.get("exercise", "")))
             self.sleep.SetValue(str(entry.get("sleep", "")))
             self.water.SetValue(str(entry.get("water", "")))
@@ -71,17 +72,140 @@ class DayEntryWindow(wx.Frame):
 
     def on_save(self, event):
         """Save data for this day."""
-        self.data[self.date] = {
+        # Ensure date contains a dict (merge with existing nested trackers if present)
+        existing = self.data.get(self.date, {})
+        existing.update({
             "exercise": self.exercise.GetValue(),
             "sleep": self.sleep.GetValue(),
             "water": self.water.GetValue(),
             "calories": self.calories.GetValue(),
             "mood": self.mood.GetValue(),
-        }
+        })
+        self.data[self.date] = existing
 
         save_data(self.data)
         wx.MessageBox("Data saved successfully!", "Saved", wx.OK | wx.ICON_INFORMATION)
         self.Close()
+
+# ----------------------
+# Daily Report Window
+# ----------------------
+
+class DailyReportWindow(wx.Frame):
+    def __init__(self, parent, date, data):
+        super().__init__(parent, title=f"Daily Report - {date}", size=(420, 380))
+        panel = wx.Panel(self)
+
+        date = str(date)
+        wx.StaticText(panel, label=f"Report for {date}", pos=(140, 20))
+
+        entry = data.get(date, None)
+        goals = data.get("goals", {})
+
+        if not entry:
+            wx.StaticText(panel, label="No data recorded for this day.", pos=(100, 150))
+            return
+
+        # Pull top-level values (fall back to nested trackers if present)
+        exercise = float(entry.get("exercise", 0) or 0)
+        sleep = float(entry.get("sleep", 0) or 0)
+        water = float(entry.get("water", 0) or 0)
+        calories = float(entry.get("calories", 0) or 0)
+        mood = entry.get("mood", "None")
+
+        # Nutrition and sleep tracker nested info (if present)
+        nutrition = entry.get("nutrition", {})
+        sleep_tracker = entry.get("sleep_tracker", {})
+
+        wx.StaticText(panel, label=f"Exercise: {exercise} min", pos=(30, 70))
+        wx.StaticText(panel, label=f"Sleep: {sleep} hours", pos=(30, 100))
+        wx.StaticText(panel, label=f"Water: {water} glasses", pos=(30, 130))
+        wx.StaticText(panel, label=f"Calories: {calories}", pos=(30, 160))
+        wx.StaticText(panel, label=f"Mood: {mood}", pos=(30, 190))
+
+        # Nutrition summary
+        wx.StaticText(panel, label="Nutrition (cal):", pos=(220, 70))
+        wx.StaticText(panel, label=f"Breakfast: {nutrition.get('breakfast','-')}", pos=(220, 100))
+        wx.StaticText(panel, label=f"Lunch: {nutrition.get('lunch','-')}", pos=(220, 130))
+        wx.StaticText(panel, label=f"Dinner: {nutrition.get('dinner','-')}", pos=(220, 160))
+        wx.StaticText(panel, label=f"Snacks: {nutrition.get('snacks','-')}", pos=(220, 190))
+
+        # Sleep tracker nested info
+        wx.StaticText(panel, label="Sleep Tracker:", pos=(30, 220))
+        wx.StaticText(panel, label=f"Hours: {sleep_tracker.get('hours','-')}", pos=(30, 250))
+        wx.StaticText(panel, label=f"Quality: {sleep_tracker.get('quality','-')}", pos=(170, 250))
+        wx.StaticText(panel, label=f"Bedtime: {sleep_tracker.get('bedtime','-')}", pos=(320, 250))
+
+        # Goal comparisons
+        def compare(value, goal):
+            if goal is None or goal == "":
+                return "No goal set"
+            try:
+                if float(value) >= float(goal):
+                    return "Goal met ✔"
+                else:
+                    return "Goal missed ✘"
+            except:
+                return "N/A"
+
+        wx.StaticText(panel, label="Goal Check:", pos=(30, 280))
+        wx.StaticText(panel, label=f"Exercise: {compare(exercise, goals.get('exercise_goal'))}", pos=(30, 300))
+        wx.StaticText(panel, label=f"Sleep: {compare(sleep, goals.get('sleep_goal'))}", pos=(220, 300))
+
+# ----------------------
+# Monthly Report Window
+# ----------------------
+
+class MonthlyReportWindow(wx.Frame):
+    def __init__(self, parent, data):
+        super().__init__(parent, title="Monthly Report", size=(500, 420))
+        panel = wx.Panel(self)
+
+        today = datetime.date.today()
+        month_start = today.replace(day=1)
+
+        wx.StaticText(panel, label=f"Monthly Report - {today.strftime('%B %Y')}", pos=(150, 20))
+
+        entries = []
+        for key, entry in data.items():
+            if key == "goals":
+                continue
+            try:
+                d = datetime.datetime.strptime(key, "%Y-%m-%d").date()
+                if d >= month_start and d <= today:
+                    entries.append(entry)
+            except:
+                pass
+
+        if not entries:
+            wx.StaticText(panel, label="No data recorded this month.", pos=(150, 150))
+            return
+
+        # Summaries
+        total = {"exercise": 0, "sleep": 0, "water": 0, "calories": 0}
+        moods = {}
+
+        for entry in entries:
+            for k in total:
+                total[k] += float(entry.get(k, 0) or 0)
+
+            mood = entry.get("mood", "")
+            if mood:
+                moods[mood] = moods.get(mood, 0) + 1
+
+        num = len(entries)
+        avg_exercise = total["exercise"] / num
+        avg_sleep = total["sleep"] / num
+        avg_water = total["water"] / num
+        avg_calories = total["calories"] / num
+        common_mood = max(moods, key=moods.get) if moods else "N/A"
+
+        wx.StaticText(panel, label=f"Days logged: {num}", pos=(30, 80))
+        wx.StaticText(panel, label=f"Avg Exercise: {avg_exercise:.1f} min", pos=(30, 120))
+        wx.StaticText(panel, label=f"Avg Sleep: {avg_sleep:.1f} hrs", pos=(30, 150))
+        wx.StaticText(panel, label=f"Avg Water: {avg_water:.1f} glasses", pos=(30, 180))
+        wx.StaticText(panel, label=f"Avg Calories: {avg_calories:.1f}", pos=(30, 210))
+        wx.StaticText(panel, label=f"Most Common Mood: {common_mood}", pos=(30, 240))
 
 # ----------------------
 # Weekly Summary Window (corrected 7 calendar days)
@@ -105,7 +229,7 @@ class WeeklySummaryWindow(wx.Frame):
             try:
                 entry_date = datetime.datetime.strptime(key, "%Y-%m-%d").date()
 
-                # FIX: Only include true last 7 calendar days
+                # Only include true last 7 calendar days
                 if seven_days_ago <= entry_date <= today:
                     valid_entries[key] = entry
 
@@ -288,27 +412,39 @@ class SleepTrackerWindow(wx.Frame):
 
 class MainWindow(wx.Frame):
     def __init__(self):
-        super().__init__(None, title="Mindful Path Wellness Tracker", size=(420, 380))
+        super().__init__(None, title="Mindful Path Wellness Tracker", size=(520, 420))
         panel = wx.Panel(self)
 
         self.data = load_data()
         self.current_date = datetime.date.today()
 
-        self.date_label = wx.StaticText(panel, label=str(self.current_date), pos=(160, 30))
+        self.date_label = wx.StaticText(panel, label=str(self.current_date), pos=(200, 20))
 
         prev_btn = wx.Button(panel, label="<< Previous", pos=(50, 70))
-        next_btn = wx.Button(panel, label="Next >>", pos=(230, 70))
-        open_day_btn = wx.Button(panel, label="Open Daily Entry", pos=(130, 120))
-        weekly_btn = wx.Button(panel, label="Weekly Summary", pos=(50, 180))
-        goals_btn = wx.Button(panel, label="Set Goals", pos=(230, 180))
-        nutrition_btn = wx.Button(panel, label="Nutrition Tracker", pos=(50, 240))
-        sleep_btn = wx.Button(panel, label="Sleep Tracker", pos=(230, 240))
+        next_btn = wx.Button(panel, label="Next >>", pos=(370, 70))
+        open_day_btn = wx.Button(panel, label="Open Daily Entry", pos=(200, 70))
 
+        weekly_btn = wx.Button(panel, label="Weekly Summary", pos=(50, 140))
+        goals_btn = wx.Button(panel, label="Set Goals", pos=(370, 140))
+
+        # Daily and Monthly Report buttons (added)
+        daily_report_btn = wx.Button(panel, label="Daily Report", pos=(50, 200))
+        monthly_report_btn = wx.Button(panel, label="Monthly Report", pos=(370, 200))
+
+        nutrition_btn = wx.Button(panel, label="Nutrition Tracker", pos=(50, 260))
+        sleep_btn = wx.Button(panel, label="Sleep Tracker", pos=(370, 260))
+
+        # Bindings
         prev_btn.Bind(wx.EVT_BUTTON, self.on_prev_day)
         next_btn.Bind(wx.EVT_BUTTON, self.on_next_day)
         open_day_btn.Bind(wx.EVT_BUTTON, self.on_open_day)
+
         weekly_btn.Bind(wx.EVT_BUTTON, self.on_weekly_summary)
         goals_btn.Bind(wx.EVT_BUTTON, self.on_goals)
+
+        daily_report_btn.Bind(wx.EVT_BUTTON, self.on_daily_report)
+        monthly_report_btn.Bind(wx.EVT_BUTTON, self.on_monthly_report)
+
         nutrition_btn.Bind(wx.EVT_BUTTON, self.on_nutrition)
         sleep_btn.Bind(wx.EVT_BUTTON, self.on_sleep)
 
@@ -331,6 +467,12 @@ class MainWindow(wx.Frame):
 
     def on_goals(self, event):
         GoalsWindow(self, self.data).Show()
+
+    def on_daily_report(self, event):
+        DailyReportWindow(self, self.current_date, self.data).Show()
+
+    def on_monthly_report(self, event):
+        MonthlyReportWindow(self, self.data).Show()
 
     def on_nutrition(self, event):
         NutritionTrackerWindow(self, self.current_date, self.data).Show()
