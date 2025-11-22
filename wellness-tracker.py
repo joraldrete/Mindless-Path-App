@@ -49,7 +49,12 @@ class DayEntryWindow(wx.Frame):
         self.calories = wx.TextCtrl(panel, pos=(180, 150), size=(150, -1))
 
         wx.StaticText(panel, label="Mood:", pos=(30, 190))
-        self.mood = wx.ComboBox(panel, choices=["😀 Happy", "😐 Okay", "😞 Sad", "😡 Angry", "😴 Tired"], pos=(180, 190), size=(150, -1))
+        self.mood = wx.ComboBox(
+            panel,
+            choices=["😀 Happy", "😐 Okay", "😞 Sad", "😡 Angry", "😴 Tired"],
+            pos=(180, 190),
+            size=(150, -1)
+        )
 
         # Load existing data if available
         if self.date in self.data:
@@ -79,7 +84,7 @@ class DayEntryWindow(wx.Frame):
         self.Close()
 
 # ----------------------
-# Weekly Summary Window (fixed last 7 calendar days)
+# Weekly Summary Window (corrected 7 calendar days)
 # ----------------------
 
 class WeeklySummaryWindow(wx.Frame):
@@ -96,10 +101,14 @@ class WeeklySummaryWindow(wx.Frame):
         for key, entry in data.items():
             if key == "goals":
                 continue
+
             try:
                 entry_date = datetime.datetime.strptime(key, "%Y-%m-%d").date()
+
+                # FIX: Only include true last 7 calendar days
                 if seven_days_ago <= entry_date <= today:
                     valid_entries[key] = entry
+
             except ValueError:
                 continue
 
@@ -116,6 +125,7 @@ class WeeklySummaryWindow(wx.Frame):
                 mood_counts[mood] = mood_counts.get(mood, 0) + 1
 
         num_days = len(sorted_entries)
+
         if num_days > 0:
             avg_exercise = total["exercise"] / num_days
             avg_sleep = total["sleep"] / num_days
@@ -157,6 +167,7 @@ class GoalsWindow(wx.Frame):
         self.water_goal = wx.TextCtrl(panel, pos=(180, 150), size=(150, -1))
         self.calories_goal = wx.TextCtrl(panel, pos=(180, 190), size=(150, -1))
 
+        # Load saved goals
         goals = self.data.get("goals", {})
         self.exercise_goal.SetValue(str(goals.get("exercise_goal", "")))
         self.sleep_goal.SetValue(str(goals.get("sleep_goal", "")))
@@ -171,7 +182,7 @@ class GoalsWindow(wx.Frame):
             "exercise_goal": self.exercise_goal.GetValue(),
             "sleep_goal": self.sleep_goal.GetValue(),
             "water_goal": self.water_goal.GetValue(),
-            "calories_goal": self.calories_goal.GetValue()
+            "calories_goal": self.calories_goal.GetValue(),
         }
         self.data["goals"] = goals
         save_data(self.data)
@@ -179,7 +190,7 @@ class GoalsWindow(wx.Frame):
         self.Close()
 
 # ----------------------
-# Nutrition Tracker Window
+# Nutrition Tracker
 # ----------------------
 
 class NutritionTrackerWindow(wx.Frame):
@@ -229,7 +240,7 @@ class NutritionTrackerWindow(wx.Frame):
         self.Close()
 
 # ----------------------
-# Sleep Tracker Window
+# Sleep Tracker
 # ----------------------
 
 class SleepTrackerWindow(wx.Frame):
@@ -344,3 +355,4 @@ class MindfulPathApp(wx.App):
 if __name__ == "__main__":
     app = MindfulPathApp()
     app.MainLoop()
+
